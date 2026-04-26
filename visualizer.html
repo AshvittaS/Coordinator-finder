@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Annotation Coordinate Visualizer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #22222f;
+    --border: #2e2e42;
+    --accent: #7c6cfc;
+    --accent2: #fc6c9b;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --success: #4ade80;
+    --warning: #fbbf24;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  header .logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  header h1 { font-size: 18px; font-weight: 600; }
+  header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 73px);
+  }
+
+  /* LEFT PANEL */
+  .panel {
+    width: 340px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+  }
+  .upload-zone:hover { border-color: var(--accent); background: #1e1e2e; }
+  .upload-zone.dragging { border-color: var(--accent); background: #2a2040; }
+  .upload-zone .icon { font-size: 32px; margin-bottom: 8px; }
+  .upload-zone p { font-size: 13px; color: var(--muted); }
+  .upload-zone strong { color: var(--text); }
+  #fileInput { display: none; }
+
+  .img-info {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    display: none;
+  }
+  .img-info span { color: var(--success); font-weight: 600; }
+
+  textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 12px;
+    resize: vertical;
+    min-height: 120px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  .format-hint {
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    line-height: 1.8;
+  }
+  .format-hint code {
+    background: #2e2e42;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--accent);
+    font-size: 11px;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #9b6cfc);
+    color: #fff;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124,108,252,0.4); }
+  .btn-secondary {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--text); }
+
+  .annotations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .ann-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+  }
+  .ann-item:hover { border-color: var(--accent); }
+  .ann-item.active { border-color: var(--accent); background: #2a2040; }
+
+  .ann-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .ann-info { flex: 1; overflow: hidden; }
+  .ann-label { font-weight: 500; color: var(--text); }
+  .ann-coords { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .ann-del {
+    cursor: pointer; color: var(--muted); font-size: 14px;
+    line-height: 1; padding: 2px 4px; border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .ann-del:hover { color: var(--accent2); }
+
+  /* RIGHT CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #0a0a10;
+  }
+
+  .canvas-toolbar {
+    padding: 10px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+
+  .canvas-toolbar .zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .zoom-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 14px;
+    transition: all 0.15s;
+  }
+  .zoom-btn:hover { border-color: var(--accent); }
+
+  .canvas-wrapper {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 20px;
+  }
+
+  .canvas-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  #mainCanvas {
+    display: block;
+    border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--muted);
+  }
+  .empty-state .big-icon { font-size: 64px; opacity: 0.3; }
+  .empty-state p { font-size: 14px; }
+
+  .error-msg {
+    color: var(--accent2);
+    font-size: 12px;
+    padding: 8px 12px;
+    background: #2a1525;
+    border: 1px solid #4a2535;
+    border-radius: 8px;
+    display: none;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎯</div>
+  <div>
+    <h1>Annotation Coordinate Visualizer</h1>
+    <p>Upload an image · Enter bbox or polygon coords · See annotations rendered</p>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- LEFT PANEL -->
+  <div class="panel">
+
+    <!-- Upload -->
+    <div>
+      <div class="section-title">📂 Image</div>
+      <div class="upload-zone" id="uploadZone">
+        <div class="icon">🖼️</div>
+        <p><strong>Click to upload</strong> or drag & drop</p>
+        <p>PNG, JPG, WebP supported</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" />
+      <div class="img-info" id="imgInfo">
+        ✅ Loaded: <span id="imgName"></span> &nbsp;|&nbsp; <span id="imgSize"></span>
+      </div>
+    </div>
+
+    <!-- Coordinate Input -->
+    <div>
+      <div class="section-title">📐 Add Annotation</div>
+      <div class="format-hint">
+        <b>BBox:</b> <code>x, y, w, h</code> — e.g. <code>120, 45, 80, 30</code><br/>
+        <b>Polygon:</b> <code>x1,y1; x2,y2; x3,y3 ...</code><br/>
+        <b>Label (optional):</b> add label at end after <code>|</code><br/>
+        e.g. <code>100,50,200,60 | க</code><br/>
+        One annotation per line. All coords in <b>image pixels</b>.
+      </div>
+      <br/>
+      <textarea id="coordInput" placeholder="120, 45, 80, 30&#10;100,50; 200,50; 200,120; 100,120 | polygon&#10;300, 80, 60, 40 | க"></textarea>
+      <div class="error-msg" id="errorMsg"></div>
+      <br/>
+      <button class="btn btn-primary" id="addBtn">▶ Render Annotations</button>
+      <button class="btn btn-secondary" id="clearBtn">✕ Clear All</button>
+    </div>
+
+    <!-- Annotation List -->
+    <div>
+      <div class="section-title">📋 Annotations (<span id="annCount">0</span>)</div>
+      <div class="annotations-list" id="annList"></div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS AREA -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-toolbar" id="toolbar" style="display:none">
+      <span id="toolbarInfo">Image coords in natural pixels</span>
+      <div class="zoom-controls">
+        <div class="zoom-btn" id="zoomOut">−</div>
+        <span id="zoomLabel" style="min-width:40px;text-align:center">100%</span>
+        <div class="zoom-btn" id="zoomIn">+</div>
+        <div class="zoom-btn" id="zoomFit" title="Fit to window">⊡</div>
+      </div>
+    </div>
+    <div class="empty-state" id="emptyState">
+      <div class="big-icon">🖼️</div>
+      <p>Upload an image to get started</p>
+    </div>
+    <div class="canvas-wrapper" id="canvasWrapper" style="display:none">
+      <div class="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let img = null;
+let annotations = [];
+let zoom = 1;
+let selectedIdx = -1;
+
+const COLORS = [
+  '#7c6cfc','#fc6c9b','#4ade80','#fbbf24','#38bdf8',
+  '#f472b6','#a78bfa','#34d399','#fb923c','#60a5fa'
+];
+
+// ── Elements ─────────────────────────────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+const fileInput  = document.getElementById('fileInput');
+const imgInfo    = document.getElementById('imgInfo');
+const imgName    = document.getElementById('imgName');
+const imgSize    = document.getElementById('imgSize');
+const coordInput = document.getElementById('coordInput');
+const addBtn     = document.getElementById('addBtn');
+const clearBtn   = document.getElementById('clearBtn');
+const annList    = document.getElementById('annList');
+const annCount   = document.getElementById('annCount');
+const canvas     = document.getElementById('mainCanvas');
+const ctx        = canvas.getContext('2d');
+const emptyState = document.getElementById('emptyState');
+const canvasWrapper = document.getElementById('canvasWrapper');
+const toolbar    = document.getElementById('toolbar');
+const toolbarInfo = document.getElementById('toolbarInfo');
+const errorMsg   = document.getElementById('errorMsg');
+const zoomLabel  = document.getElementById('zoomLabel');
+
+// ── Upload ───────────────────────────────────────────────────────────────────
+uploadZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadImage(e.target.files[0]));
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragging'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragging'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragging');
+  if (e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+});
+
+function loadImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      imgName.textContent = file.name;
+      imgSize.textContent = `${image.naturalWidth} × ${image.naturalHeight} px`;
+      imgInfo.style.display = 'block';
+      emptyState.style.display = 'none';
+      canvasWrapper.style.display = 'flex';
+      toolbar.style.display = 'flex';
+      fitZoom();
+      render();
+    };
+    image.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Parse Coordinates ────────────────────────────────────────────────────────
+function parseInput(raw) {
+  const lines = raw.trim().split('\n').filter(l => l.trim());
+  const results = [];
+  const errors = [];
+
+  lines.forEach((line, i) => {
+    const [coordPart, labelPart] = line.split('|');
+    const label = labelPart ? labelPart.trim() : '';
+    const coordStr = coordPart.trim();
+
+    // Detect polygon (contains semicolons or more than 4 comma-separated numbers)
+    if (coordStr.includes(';')) {
+      // Polygon mode: x1,y1; x2,y2; ...
+      const pts = coordStr.split(';').map(p => {
+        const [px, py] = p.trim().split(',').map(Number);
+        return { x: px, y: py };
+      });
+      if (pts.some(p => isNaN(p.x) || isNaN(p.y))) {
+        errors.push(`Line ${i+1}: invalid polygon coords`);
+        return;
+      }
+      results.push({ type: 'polygon', points: pts, label, color: COLORS[results.length % COLORS.length] });
+    } else {
+      // BBox mode: x, y, w, h
+      const nums = coordStr.split(',').map(s => parseFloat(s.trim()));
+      if (nums.length < 4 || nums.some(isNaN)) {
+        errors.push(`Line ${i+1}: expected "x, y, w, h" — got "${coordStr}"`);
+        return;
+      }
+      const [x, y, w, h] = nums;
+      results.push({ type: 'bbox', x, y, w, h, label, color: COLORS[results.length % COLORS.length] });
+    }
+  });
+
+  return { results, errors };
+}
+
+addBtn.addEventListener('click', () => {
+  const raw = coordInput.value;
+  if (!raw.trim()) return;
+  const { results, errors } = parseInput(raw);
+  errorMsg.style.display = errors.length ? 'block' : 'none';
+  errorMsg.textContent = errors.join('\n');
+  annotations.push(...results);
+  updateList();
+  render();
+  coordInput.value = '';
+});
+
+clearBtn.addEventListener('click', () => {
+  annotations = [];
+  selectedIdx = -1;
+  updateList();
+  render();
+  errorMsg.style.display = 'none';
+});
+
+// ── Annotation List ──────────────────────────────────────────────────────────
+function updateList() {
+  annCount.textContent = annotations.length;
+  annList.innerHTML = '';
+  annotations.forEach((ann, i) => {
+    const item = document.createElement('div');
+    item.className = 'ann-item' + (i === selectedIdx ? ' active' : '');
+    const dot = `<div class="ann-dot" style="background:${ann.color}"></div>`;
+    const coordStr = ann.type === 'bbox'
+      ? `bbox(${ann.x}, ${ann.y}, ${ann.w}, ${ann.h})`
+      : `polygon(${ann.points.length} pts)`;
+    item.innerHTML = `
+      ${dot}
+      <div class="ann-info">
+        <div class="ann-label">${ann.label || ('Ann #' + (i+1))}</div>
+        <div class="ann-coords">${coordStr}</div>
+      </div>
+      <div class="ann-del" data-i="${i}" title="Remove">✕</div>
+    `;
+    item.addEventListener('click', () => {
+      selectedIdx = i;
+      updateList();
+      render();
+    });
+    item.querySelector('.ann-del').addEventListener('click', e => {
+      e.stopPropagation();
+      annotations.splice(i, 1);
+      if (selectedIdx >= annotations.length) selectedIdx = -1;
+      updateList();
+      render();
+    });
+    annList.appendChild(item);
+  });
+}
+
+// ── Zoom ─────────────────────────────────────────────────────────────────────
+document.getElementById('zoomIn').addEventListener('click', () => setZoom(zoom * 1.25));
+document.getElementById('zoomOut').addEventListener('click', () => setZoom(zoom / 1.25));
+document.getElementById('zoomFit').addEventListener('click', fitZoom);
+
+function setZoom(z) {
+  zoom = Math.max(0.1, Math.min(8, z));
+  zoomLabel.textContent = Math.round(zoom * 100) + '%';
+  render();
+}
+
+function fitZoom() {
+  if (!img) return;
+  const wrapper = canvasWrapper;
+  const availW = wrapper.clientWidth - 40;
+  const availH = wrapper.clientHeight - 40;
+  zoom = Math.min(availW / img.naturalWidth, availH / img.naturalHeight, 1);
+  zoomLabel.textContent = Math.round(zoom * 100) + '%';
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  if (!img) return;
+
+  const W = Math.round(img.naturalWidth * zoom);
+  const H = Math.round(img.naturalHeight * zoom);
+  canvas.width = W;
+  canvas.height = H;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(img, 0, 0, W, H);
+
+  const scaleX = W / img.naturalWidth;
+  const scaleY = H / img.naturalHeight;
+
+  annotations.forEach((ann, i) => {
+    const isSelected = i === selectedIdx;
+    ctx.save();
+
+    if (ann.type === 'bbox') {
+      const dx = ann.x * scaleX;
+      const dy = ann.y * scaleY;
+      const dw = ann.w * scaleX;
+      const dh = ann.h * scaleY;
+
+      // Fill
+      ctx.fillStyle = ann.color + '28';
+      ctx.fillRect(dx, dy, dw, dh);
+
+      // Border
+      ctx.strokeStyle = ann.color;
+      ctx.lineWidth = isSelected ? 3 : 2;
+      if (isSelected) {
+        ctx.shadowColor = ann.color;
+        ctx.shadowBlur = 10;
+      }
+      ctx.strokeRect(dx, dy, dw, dh);
+
+      // Corner dots
+      const corners = [[dx,dy],[dx+dw,dy],[dx+dw,dy+dh],[dx,dy+dh]];
+      corners.forEach(([cx, cy]) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI*2);
+        ctx.fillStyle = ann.color;
+        ctx.fill();
+      });
+
+      // Label
+      drawLabel(ann.label || `#${i+1}`, dx, dy, ann.color);
+
+    } else if (ann.type === 'polygon') {
+      if (!ann.points.length) return;
+      ctx.beginPath();
+      ann.points.forEach((pt, j) => {
+        const px = pt.x * scaleX;
+        const py = pt.y * scaleY;
+        if (j === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+
+      ctx.fillStyle = ann.color + '28';
+      ctx.fill();
+
+      ctx.strokeStyle = ann.color;
+      ctx.lineWidth = isSelected ? 3 : 2;
+      if (isSelected) { ctx.shadowColor = ann.color; ctx.shadowBlur = 10; }
+      ctx.stroke();
+
+      // Vertex dots
+      ann.points.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x * scaleX, pt.y * scaleY, 4, 0, Math.PI*2);
+        ctx.fillStyle = ann.color;
+        ctx.fill();
+      });
+
+      const px0 = ann.points[0].x * scaleX;
+      const py0 = ann.points[0].y * scaleY;
+      drawLabel(ann.label || `#${i+1}`, px0, py0, ann.color);
+    }
+
+    ctx.restore();
+  });
+
+  // Toolbar info
+  if (img) {
+    toolbarInfo.textContent = `Image: ${img.naturalWidth}×${img.naturalHeight}px · Annotations: ${annotations.length}`;
+  }
+}
+
+function drawLabel(text, x, y, color) {
+  if (!text) return;
+  const fontSize = Math.max(11, 13 / zoom * zoom);
+  ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+  const tw = ctx.measureText(text).width;
+  const pad = 4;
+  const bx = x;
+  const by = y - fontSize - pad * 2;
+
+  ctx.fillStyle = color;
+  roundRect(ctx, bx, by, tw + pad*2, fontSize + pad*2, 4);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, bx + pad, by + fontSize + pad - 1);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
+  if (e.key === '-') setZoom(zoom / 1.25);
+  if (e.key === '0') fitZoom(), render();
+  if (e.key === 'Enter' && document.activeElement === coordInput) {
+    addBtn.click();
+  }
+});
+
+// ── Mouse hover tooltip ──────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const imgX = Math.round(cx / zoom);
+  const imgY = Math.round(cy / zoom);
+  canvas.title = `Image coords: (${imgX}, ${imgY})`;
+});
+</script>
+</body>
+</html>
